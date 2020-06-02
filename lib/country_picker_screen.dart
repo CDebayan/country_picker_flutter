@@ -8,13 +8,15 @@ import 'package:flutter/material.dart';
 
 class CountryPickerScreen extends StatefulWidget {
   final CountryListBloc _bloc;
+
   CountryPickerScreen(this._bloc);
 
   @override
   _CountryPickerScreenState createState() => _CountryPickerScreenState();
 }
 
-class _CountryPickerScreenState extends State<CountryPickerScreen> with Functionality{
+class _CountryPickerScreenState extends State<CountryPickerScreen> with Functionality {
+  bool showAppBar = true;
 
   @override
   void initState() {
@@ -24,15 +26,21 @@ class _CountryPickerScreenState extends State<CountryPickerScreen> with Function
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: <Widget>[
-            _buildSearchBar(),
-            Expanded(
-              child: _validateResult(),
-            ),
-          ],
+    return WillPopScope(
+      onWillPop: () async {
+        if (!showAppBar) {
+          setState(() {
+            widget._bloc.eventController.add(FetchCountryList());
+            showAppBar = true;
+          });
+          return false;
+        }
+        return true;
+      },
+      child: Scaffold(
+        appBar: _buildSearchBar(),
+        body: SafeArea(
+          child: _validateResult(),
         ),
       ),
     );
@@ -45,13 +53,13 @@ class _CountryPickerScreenState extends State<CountryPickerScreen> with Function
           if (snapshot.data is LoadedState) {
             LoadedState data = snapshot.data;
             return _buildCountryList(data.countryList);
-          }else {
+          } else {
             return Container();
           }
         });
   }
 
-  Widget _buildCountryList(List<CountryModel> countryList){
+  Widget _buildCountryList(List<CountryModel> countryList) {
     return ListView.builder(
         itemCount: countryList.length,
         itemBuilder: (_, index) {
@@ -72,33 +80,70 @@ class _CountryPickerScreenState extends State<CountryPickerScreen> with Function
                   width: 8,
                 ),
                 (countryList[index].isSelected == null ||
-                    !countryList[index].isSelected)
+                        !countryList[index].isSelected)
                     ? Container(
-                  width: 24,
-                )
+                        width: 24,
+                      )
                     : Icon(Icons.check),
               ],
             ),
             selected: countryList[index].isSelected,
             onTap: () {
               widget._bloc.eventController
-                  .add(SelectCountry(countryList[index],context));
+                  .add(SelectCountry(countryList[index], context));
             },
           );
         });
   }
 
   _buildSearchBar() {
-    return Container(
-      margin: EdgeInsets.only(left: 16, right: 16, bottom: 8),
-      child: TextField(
-        decoration: InputDecoration(hintText: "Search Country"),
-        onChanged: (value) {
-          Debouncer(milliseconds: 500).run(() {
-            widget._bloc.eventController.add(SearchCountry(value));
-          });
-        },
-      ),
-    );
+    final TextEditingController _controller = TextEditingController();
+    if (showAppBar) {
+      return AppBar(
+        title: Text("Choose a country"),
+        actions: <Widget>[
+          IconButton(
+            icon: Icon(Icons.search),
+            onPressed: () {
+              setState(() {
+                showAppBar = false;
+              });
+            },
+          )
+        ],
+      );
+    } else {
+      return AppBar(
+        title: TextField(
+          controller: _controller,
+          style: TextStyle(
+            color: Colors.white,
+          ),
+          cursorColor: Colors.white,
+          decoration: InputDecoration.collapsed(
+            hintText: "Search...",
+            hintStyle: TextStyle(
+              color: Colors.white,
+            ),
+          ),
+          onChanged: (value) {
+            Debouncer(milliseconds: 500).run(() {
+              widget._bloc.eventController.add(SearchCountry(value));
+            });
+          },
+        ),
+        actions: <Widget>[
+          IconButton(
+            icon: Icon(Icons.close),
+            onPressed: () {
+              setState(() {
+                widget._bloc.eventController.add(FetchCountryList());
+                showAppBar = true;
+              });
+            },
+          )
+        ],
+      );
+    }
   }
 }
